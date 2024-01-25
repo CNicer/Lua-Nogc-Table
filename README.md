@@ -130,7 +130,7 @@ firenogc()
 - The complete Lua source files (version 5.4.4) are stored in the **luasrc** folder
 - Simple examples are stored in the **test** folder
 
-## 使用
+## Usage
 
 Development and testing are based on version 5.4.4. <br><br>
 When using other Lua versions, follow the steps below

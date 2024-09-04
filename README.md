@@ -45,8 +45,11 @@ static lu_mem traversetable (global_State *g, Table *h) {
   return 1 + h->alimit + 2 * allocsizenode(h);
 }
 ```
-3. 如果希望表同时为只读，不允许修改插入，按以下修改
-3.1 在lvm.h文件中，添加下面的宏
+3. 在你的main函数中引用xnogc.h头文件并调用**luaL_opengclibs(L)**
+
+## 如何让Table只读
+1. 如果希望表同时为只读，不允许修改插入，按以下修改
+1.1 在lvm.h文件中，添加下面的宏
 ```c
 /*
 * @xuyao
@@ -56,14 +59,14 @@ static lu_mem traversetable (global_State *g, Table *h) {
 #define checkgctw(L, o) checktw(L, gco2t(o))
 #define checkvtw(L, t)  checkgctw(L, gcvalue(t))
 ```
-3.2 在lvm.h文件中，修改luaV_finishfastset宏为
+1.2 在lvm.h文件中，修改luaV_finishfastset宏为
 ```c
 #define luaV_finishfastset(L,t,slot,v) \
     { checkvtw(L, t);\
       setobj2t(L, cast(TValue *,slot), v); \
       luaC_barrierback(L, gcvalue(t), v); }
 ```
-3.3 在所有调用setobj2t宏的上方添加checktw(L, t)，以下为5.4.4版本中添加的位置
+1.3 在所有调用setobj2t宏的上方添加checktw(L, t)，以下为5.4.4版本中添加的位置
 ```c
 /* 
 lvm.c:1806
@@ -89,7 +92,6 @@ ltable.c:841
       checktw(L, t);
       setobj2t(L, cast(TValue*, p), value);
 ```
-4.3 在你的main函数中调用**luaL_opengclibs(L)**
 
 ## lua使用实例
 
@@ -161,8 +163,13 @@ static lu_mem traversetable (global_State *g, Table *h) {
   return 1 + h->alimit + 2 * allocsizenode(h);
 }
 ```
-3. If you want the table to be read-only at the same time and do not allow modification and insertion, modify it as follows
-3.1 In the lvm.h file, add the following macro
+
+4 In your main function, include the xnogc.h header file and call **luaL_opengclibs(L)**
+
+## How to make a Table read-only
+
+1. If you want the table to be read-only at the same time and do not allow modification and insertion, modify it as follows
+1.1 In the lvm.h file, add the following macro
 ```c
 /*
 * @xuyao
@@ -172,14 +179,14 @@ static lu_mem traversetable (global_State *g, Table *h) {
 #define checkgctw(L, o) checktw(L, gco2t(o))
 #define checkvtw(L, t)  checkgctw(L, gcvalue(t))
 ```
-3.2 In the lvm.h file, modify the luaV_finishfastset macro to
+1.2 In the lvm.h file, modify the luaV_finishfastset macro to
 ```c
 #define luaV_finishfastset(L,t,slot,v) \
     { checkvtw(L, t);\
       setobj2t(L, cast(TValue *,slot), v); \
       luaC_barrierback(L, gcvalue(t), v); }
 ```
-3.3 Add checktw(L, t) above all calls to the setobj2t macro. The following is the location added in version 5.4.4
+1.3 Add checktw(L, t) above all calls to the setobj2t macro. The following is the location added in version 5.4.4
 ```c
 /* 
 lvm.c:1806
@@ -205,7 +212,6 @@ ltable.c:841
       checktw(L, t);
       setobj2t(L, cast(TValue*, p), value);
 ```
-4.3 Call **luaL_opengclibs(L)** in your main function
 
 ## lua usage example
 

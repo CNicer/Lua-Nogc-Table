@@ -164,7 +164,7 @@ static lu_mem traversetable (global_State *g, Table *h) {
 }
 ```
 
-4 In your main function, include the xnogc.h header file and call **luaL_opengclibs(L)**
+4. In your main function, include the xnogc.h header file and call **luaL_opengclibs(L)**
 
 ## How to make a Table read-only
 

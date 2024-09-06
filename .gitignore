@@ -1,0 +1,7 @@
+Test/build-win/*
+Test/build-linux/*
+!Test/build-win/Release
+!Test/build-win/Release/Test.exe
+!Test/build-win/Release/test.lua
+!Test/build-linux/Test
+!Test/build-linux/test.lua

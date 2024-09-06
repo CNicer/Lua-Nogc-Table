@@ -5,14 +5,14 @@
 
 ## 功能
 
-- 将Lua表从gc的各个流程中剔除，并拒绝该表的修改和添加
+- 将Lua表从gc的各个流程中剔除，可选拒绝该表的修改和添加
 - 可用于减少GC消耗，例如Lua配置表过大时，这种表一般常驻且只读，可调用该nogc函数。
 - 对lua源码的侵入非常少
 
 ## 目录
 
 - luasrc文件夹下存放完整的Lua源文件（版本5.4.4）
-- test文件夹下存放简单示例
+- Test文件下存放测试工程
 
 ## 使用
 
@@ -46,6 +46,21 @@ static lu_mem traversetable (global_State *g, Table *h) {
 }
 ```
 3. 在你的main函数中引用xnogc.h头文件并调用**luaL_opengclibs(L)**
+
+## 测试工程
+1. Test目录下存放了简单的测试工程
+2. build-win和build-linux目录下存放测试的可执行程序和lua文件
+3. 编译 linux执行 **./build.sh** windows下执行 **build.cmd**
+4. 运行(linux)
+```bash
+./Test
+```
+
+## 效果
+- 一个table，包含一个function，以及数组长度5万，每个包含一个数字和字符串，hashkey个数5万，每个包含一个数字和字符串，调用nogc测试结果<br>
+![alt text](image-3.png)
+- 在正式项目，对一个物品配置表调用nogc耗时<br>
+![alt text](image-2.png)
 
 ## 如何让Table只读
 1. 如果希望表同时为只读，不允许修改插入，按以下修改
@@ -123,14 +138,14 @@ firenogc()
 
 ## Feature
 
-- Remove the Lua table from various gc processes and reject modifications and additions to the table.
+- Remove the Lua table from each gc process, and optionally reject the modification and addition of the table.
 - It can be used to reduce GC consumption. For example, when the Lua configuration table is too large, this table is generally resident and read-only, and the nogc function can be called.
 - There is very little intrusion into Lua source code
 
 ## Document
 
 - The complete Lua source files (version 5.4.4) are stored in the **luasrc** folder
-- Simple examples are stored in the **test** folder
+- Test project is stored in the Test file
 
 ## Usage
 
@@ -164,7 +179,22 @@ static lu_mem traversetable (global_State *g, Table *h) {
 }
 ```
 
-4. In your main function, include the xnogc.h header file and call **luaL_opengclibs(L)**
+3. In your main function, include the xnogc.h header file and call **luaL_opengclibs(L)**
+
+## Test Project
+1. The Test directory stores simple test project
+2. The build-win and build-linux directories store test executable programs and lua files
+3. Compile linux execute **./build.sh** windows execute **build.cmd**
+4. Run (linux)
+```bash
+./Test
+```
+
+## Performance
+- A table, containing a function, and an array length of 50,000, each containing a number and a string, 50,000 hashkeys, each containing a number and a string. Called nogc test results<br>
+![alt text](image-1.png)
+- In a formal project, calling nogc on an item configuration table takes time<br>
+![alt text](image-2.png)
 
 ## How to make a Table read-only
 

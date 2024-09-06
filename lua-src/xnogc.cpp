@@ -16,31 +16,51 @@ extern "C" {
 #include <time.h>
 
 #ifdef __linux__
+#include <stdint.h>
+#endif
+
+#ifdef __linux__
 #define likely(x) __builtin_expect(!!(x), 1) 
 #define unlikely(x) __builtin_expect(!!(x), 0)
 #elif _WIN64
-#define likeyly(x) x
+#define likely(x) x
 #define unlikely(x) x
 #endif
 
-#define TRAVERSE_CASE case LUA_VTABLE: case LUA_VLCL: case LUA_VPROTO:
-#define NOTRAVERSE_CASE case LUA_VSHRSTR: case LUA_VLNGSTR: case LUA_VUSERDATA: case LUA_VTHREAD:
+#ifdef _MSC_VER
+#if _MSVC_LANG >= 201703L
+#define CPP17M
+#endif
+#else
+#if __cplusplus >= 201703L
+#define CPP17M
+#endif
+#endif
+
+#ifdef CPP17M
+#define FALLTHROUGH [[fallthrough]];
+#else
+#define FALLTHROUGH
+#endif
+
+#define TRAVERSE_CASE case LUA_VTABLE: FALLTHROUGH case LUA_VLCL: FALLTHROUGH case LUA_VPROTO
+#define NOTRAVERSE_CASE case LUA_VSHRSTR: FALLTHROUGH case LUA_VLNGSTR: FALLTHROUGH case LUA_VUSERDATA: FALLTHROUGH case LUA_VTHREAD
 
 #define C2MS(e, s) (e-s)*1000/CLOCKS_PER_SEC
 #define COUNTCOST(c, n) \
 c;
 //clock_t s = clock(); c; clock_t e = clock(); printf(#n " cost %d\n", C2MS(e,s));
 
-#define GETPMIN(p) if(reinterpret_cast<void*>(p) < pmin) pmin = p;
-#define GETPMAX(p) if(reinterpret_cast<void*>(p) > pmax) pmax = p;
-#define GETM(p) GETPMIN(p)GETPMAX(p)
+#define GETPMIN(p) if(reinterpret_cast<void*>(p) < pmin) pmin = p
+#define GETPMAX(p) if(reinterpret_cast<void*>(p) > pmax) pmax = p
+#define GETM(p) GETPMIN(p); GETPMAX(p)
 
 #define insertN(o ,s) if(o) s.insert(obj2gco(o));GETM(o)
 #define insertS(o, s) s.insert(obj2gco(o));GETM(o)
 
 using gcset = std::unordered_set<GCObject*>;
 
-//#define DEBUG 1
+#define XNOGC_DEBUG 0
 
 void* pmax = 0;
 void* pmin = reinterpret_cast<void*>(0xFFFFFFFFFFFFFFFF);
@@ -66,30 +86,44 @@ static Table* luaX_gettable(lua_State* L, int idx)
 
 static void traverse(GCObject* o, gcset& allgc_h);
 
+static void inline gcobjectswitch(GCObject* subo, gcset& allgc_h)
+{
+    switch(subo->tt)
+    {
+    TRAVERSE_CASE:
+        traverse(subo, allgc_h);
+		FALLTHROUGH
+    NOTRAVERSE_CASE:
+        insertS(subo, allgc_h);
+        break;
+    }
+}
+
 static void traversetable(Table* h, gcset& allgc_h)
 {
 	Node* n, * limit = &h->node[(size_t)(1<<(h->lsizenode))];
 	unsigned int i, asize = luaH_realasize(h);
-	GCObject* subo = NULL;
 	for (i = 0; i < asize; i++)
 	{
-		subo = gcvalue(&h->array[i]);
-		if (subo->tt < LUA_TSTRING) continue;	/* skip gcobject by count */
-		switch (subo->tt)
-		{
-		TRAVERSE_CASE traverse(subo, allgc_h);
-		NOTRAVERSE_CASE insertS(subo, allgc_h)
-		}
+        TValue* v = &h->array[i];
+        if(!iscollectable(v)) continue;
+        gcobjectswitch(gcvalue(v), allgc_h);
 	}
 	for (n = gnode(h, 0); n < limit; n++)
 	{
 		if (isempty(gval(n))) continue;
-		if (((gval(n))->tt_) < LUA_TSTRING) continue;	/* skip gcobject by count */
-		subo = gcvalue(gval(n));
-		switch (subo->tt)
+        if (keyiscollectable(n))
+        {
+            gcobjectswitch(gckey(n), allgc_h);
+        }
+#ifdef CPP17M
+		if (TValue* vv = gval(n); iscollectable(vv))
+#else
+		TValue* vv = gval(n);
+		if (iscollectable(vv))
+#endif
 		{
-		TRAVERSE_CASE traverse(subo, allgc_h);
-		NOTRAVERSE_CASE insertS(subo, allgc_h)
+            gcobjectswitch(gcvalue(vv), allgc_h);
 		}
 	}
 }
@@ -101,12 +135,7 @@ static void traverseproto(Proto* f, gcset& allgc_h) {
 	{
 		TValue* v = &f->k[i];
 		if (v->tt_ < LUA_TSTRING) continue;
-		GCObject* o = gcvalue(v);
-		switch (o->tt)
-		{
-			TRAVERSE_CASE traverse(o, allgc_h);
-			NOTRAVERSE_CASE insertS(o, allgc_h)
-		}
+        gcobjectswitch(gcvalue(v), allgc_h);
 	}
 	for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names */
 	{
@@ -117,7 +146,7 @@ static void traverseproto(Proto* f, gcset& allgc_h) {
 		Proto* p = f->p[i];
 		if (p)
 		{
-			insertS(p, allgc_h)
+            insertS(p, allgc_h);
 			traverseproto(p, allgc_h);
 		}	
 	}
@@ -132,7 +161,7 @@ static void traverseLclosure(LClosure *cl, gcset& allgc_h)
 	insertN(cl->p, allgc_h);
 	if (cl->p)
 	{
-		insertS(cl->p, allgc_h)
+        insertS(cl->p, allgc_h);
 		traverseproto(cl->p, allgc_h);
 	}
 	for (int i = 0; i < cl->nupvalues; i++) {
@@ -158,7 +187,7 @@ static bool setTskip(lua_State* L, Table* t)
 	{
 		lua_getfield(L, 2, "__mode");
 
-		if (likeyly(!lua_isstring(L, -1)))
+		if (likely(!lua_isstring(L, -1)))
 		{
 			lua_pop(L, 1);
 			lua_pushstring(L, "s");
@@ -230,7 +259,7 @@ static void removefromallgc(lua_State* L, gcset& allgc_h)
 	{
 		if (p >= pmin && p <= pmax && allgc_h.find(p) != allgc_h.end())
 		{
-			if (prep) prep->next = p->next;
+			if (likely(prep)) prep->next = p->next;
 			else g->allgc = p->next;
 		}
 		else
@@ -259,7 +288,7 @@ static int luaX_nogc(lua_State* L)
 
 	removefromallgc(L, allgc_h);
 
-#ifdef DEBUG
+#if XNOGC_DEBUG
 	p = g->allgc;
 	while (p)
 	{
@@ -313,5 +342,6 @@ static const luaL_Reg basenogc_funcs[] = {
 extern int luaL_opengclibs(lua_State* L) {
 	lua_pushglobaltable(L);
 	luaL_setfuncs(L, basenogc_funcs, 0);
+    lua_pop(L, 1);
 	return 0;
 }

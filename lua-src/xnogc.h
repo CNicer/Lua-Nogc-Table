@@ -5,7 +5,7 @@
 */
 
 extern "C" {
-#include "lstate.h"
+#include "lua.h"
 }
 
 extern int luaL_opengclibs(lua_State* L);
